@@ -3,7 +3,7 @@ import { Borrow } from '../models/borrow.model';
 import { Book } from '../models/book.model';
 import { sendResponse } from '../utils/sendResponse';
 
-// ✅ Static helper to update availability (optional)
+
 const updateAvailability = async (bookId: string): Promise<void> => {
   const book = await Book.findById(bookId);
   if (book && book.copies <= 0) {
@@ -12,7 +12,7 @@ const updateAvailability = async (bookId: string): Promise<void> => {
   }
 };
 
-// ✅ Borrow Book Controller
+
 export const borrowBook = async (
   req: Request,
   res: Response,
@@ -21,7 +21,7 @@ export const borrowBook = async (
   try {
     const { book: bookId, quantity, dueDate } = req.body;
 
-    // 1️⃣ Check if the book exists
+    // Check if the book exists
     const book = await Book.findById(bookId);
     if (!book) {
       res.status(404).json({
@@ -31,7 +31,7 @@ export const borrowBook = async (
       return; // important: stop further execution
     }
 
-    // 2️⃣ Validate quantity
+    //  Validate quantity
     if (quantity > book.copies) {
       res.status(400).json({
         success: false,
@@ -40,24 +40,24 @@ export const borrowBook = async (
       return; // stop further execution
     }
 
-    // 3️⃣ Update book copies and availability
+    //  Update book copies and availability
     book.copies -= quantity;
     if (book.copies === 0) {
       book.available = false;
     }
     await book.save();
 
-    // 4️⃣ Create borrow entry
+    //  Create borrow entry
     const borrow = await Borrow.create({ book: bookId, quantity, dueDate });
 
-    // 5️⃣ Respond success
+    //  Respond success
     sendResponse(res, borrow, 'Book borrowed successfully', 201);
   } catch (error) {
     next(error);
   }
 };
 
-// ✅ Borrow Summary Controller (with aggregation)
+//  Borrow Summary Controller (with aggregation)
 export const getBorrowSummary = async (
   req: Request,
   res: Response,
