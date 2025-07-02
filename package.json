@@ -2,7 +2,6 @@
   "name": "library-management-api",
   "version": "1.0.0",
   "main": "index.js",
-  
   "scripts": {
     "start": "node dist/app.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec \"npx ts-node\" src/app.ts",
@@ -17,7 +16,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "mongoose": "^8.16.0"
+    "mongoose": "^8.16.0",
+    "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

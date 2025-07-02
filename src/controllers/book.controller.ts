@@ -1,51 +1,59 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { Book } from '../models/book.model';
+import { sendResponse } from '../utils/sendResponse';
 
-export const createBook = async (req: Request, res: Response): Promise<void> => {
+// CREATE
+export const createBook = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const book = await Book.create(req.body);
-    res.status(201).json({
-      success: true,
-      message: 'Book created successfully',
-      data: book,
-    });
+    sendResponse(res, book, 'Book created successfully', 201);
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      error,
-    });
+    next(error);
   }
 };
 
-export const getAllBooks = async (req: Request, res: Response): Promise<void> => {
+// GET ALL WITH PAGINATION, FILTER, SORT
+export const getAllBooks = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { filter, sortBy = 'createdAt', sort = 'asc', limit = '10' } = req.query;
+    const {
+      filter,        // filter by genre
+      sortBy = 'createdAt',
+      sort = 'asc',
+      limit = '10',
+      page = '1',
+    } = req.query;
+
+    const parsedLimit = parseInt(limit as string) || 10;
+    const parsedPage = parseInt(page as string) || 1;
+    const skip = (parsedPage - 1) * parsedLimit;
 
     const query: any = {};
     if (filter) {
       query.genre = filter;
     }
 
+    const total = await Book.countDocuments(query);
     const books = await Book.find(query)
       .sort({ [sortBy as string]: sort === 'desc' ? -1 : 1 })
-      .limit(parseInt(limit as string));
+      .skip(skip)
+      .limit(parsedLimit);
 
-    res.status(200).json({
-      success: true,
-      message: 'Books retrieved successfully',
+    sendResponse(res, {
       data: books,
-    });
+      meta: {
+        total,
+        limit: parsedLimit,
+        page: parsedPage,
+        totalPages: Math.ceil(total / parsedLimit),
+      },
+    }, 'Books retrieved successfully');
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Failed to retrieve books',
-      error,
-    });
+    next(error);
   }
 };
 
-export const getBookById = async (req: Request, res: Response): Promise<void> => {
+// GET BY ID
+export const getBookById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const book = await Book.findById(req.params.bookId);
     if (!book) {
@@ -56,26 +64,21 @@ export const getBookById = async (req: Request, res: Response): Promise<void> =>
       });
       return;
     }
-    res.status(200).json({
-      success: true,
-      message: 'Book retrieved successfully',
-      data: book,
-    });
+
+    sendResponse(res, book, 'Book retrieved successfully');
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Failed to retrieve book',
-      error,
-    });
+    next(error);
   }
 };
 
-export const updateBook = async (req: Request, res: Response): Promise<void> => {
+// UPDATE
+export const updateBook = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const book = await Book.findByIdAndUpdate(req.params.bookId, req.body, {
       new: true,
       runValidators: true,
     });
+
     if (!book) {
       res.status(404).json({
         success: false,
@@ -84,21 +87,15 @@ export const updateBook = async (req: Request, res: Response): Promise<void> => 
       });
       return;
     }
-    res.status(200).json({
-      success: true,
-      message: 'Book updated successfully',
-      data: book,
-    });
+
+    sendResponse(res, book, 'Book updated successfully');
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Failed to update book',
-      error,
-    });
+    next(error);
   }
 };
 
-export const deleteBook = async (req: Request, res: Response): Promise<void> => {
+// DELETE
+export const deleteBook = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const book = await Book.findByIdAndDelete(req.params.bookId);
     if (!book) {
@@ -109,16 +106,9 @@ export const deleteBook = async (req: Request, res: Response): Promise<void> => 
       });
       return;
     }
-    res.status(200).json({
-      success: true,
-      message: 'Book deleted successfully',
-      data: null,
-    });
+
+    sendResponse(res, null, 'Book deleted successfully');
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Failed to delete book',
-      error,
-    });
+    next(error);
   }
 };

@@ -1,48 +1,52 @@
-import express, { Application, Request, Response } from 'express';
+import express, { Application, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
-import { BookRoutes } from './routes/book.route';
-import { BorrowRoutes } from './routes/borrow.route';
+import bookRoutes from './routes/book.route';
+import borrowRoutes from './routes/borrow.route';
 
 dotenv.config();
 
 const app: Application = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/books', BookRoutes);
-app.use('/api/borrow', BorrowRoutes);
+// Application Routes
+app.use('/api/books', bookRoutes);
+app.use('/api/borrows', borrowRoutes); // ✅ Changed to plural for REST convention
 
-// Global error handler
-app.use((err: any, req: Request, res: Response, next: any) => {
-  res.status(400).json({
+// Root Route
+app.get('/', (_req: Request, res: Response) => {
+  res.send(' Library Management API Running');
+});
+
+// Global Error Handler
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || 'Something went wrong',
     error: err,
   });
 });
 
-// Root endpoint
-app.get('/', (req: Request, res: Response) => {
-  res.send('📚 Library Management API Running');
-});
-
+// Database connection & server start
 const PORT = process.env.PORT || 5000;
-const DB_URI = process.env.DATABASE_URI || 'mongodb+srv://admin:admin123@cluster0.2cqpb0d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
+const DB_URI = process.env.DATABASE_URI || 'mongodb://localhost:27017/library-api';
 
 mongoose
   .connect(DB_URI)
   .then(() => {
     console.log('✅ Connected to MongoDB');
     app.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
+      console.log(` Server running at http://localhost:${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('❌ MongoDB connection failed:', err);
+    console.error(' MongoDB connection failed:', err.message);
+    process.exit(1);
   });
 
 export default app;

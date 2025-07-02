@@ -1,9 +1,10 @@
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { Borrow } from '../models/borrow.model';
 import { Book } from '../models/book.model';
+import { sendResponse } from '../utils/sendResponse';
 
-// Static method to update availability
-const updateAvailability = async (bookId: string) => {
+// ✅ Static helper to update availability (optional)
+const updateAvailability = async (bookId: string): Promise<void> => {
   const book = await Book.findById(bookId);
   if (book && book.copies <= 0) {
     book.available = false;
@@ -11,46 +12,57 @@ const updateAvailability = async (bookId: string) => {
   }
 };
 
-export const borrowBook = async (req: Request, res: Response): Promise<void> => {
+// ✅ Borrow Book Controller
+export const borrowBook = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const { book: bookId, quantity, dueDate } = req.body;
 
+    // 1️⃣ Check if the book exists
     const book = await Book.findById(bookId);
-    if (!book || book.copies < quantity) {
-      res.status(400).json({
+    if (!book) {
+      res.status(404).json({
         success: false,
-        message: 'Not enough copies available',
-        error: {},
+        message: 'Book not found',
       });
-      return;
+      return; // important: stop further execution
     }
 
-    // Update book copies
+    // 2️⃣ Validate quantity
+    if (quantity > book.copies) {
+      res.status(400).json({
+        success: false,
+        message: 'Requested quantity exceeds available copies',
+      });
+      return; // stop further execution
+    }
+
+    // 3️⃣ Update book copies and availability
     book.copies -= quantity;
+    if (book.copies === 0) {
+      book.available = false;
+    }
     await book.save();
 
-    // Check if available needs to be updated
-    await updateAvailability(book._id!.toString());
-
-
-    // Save borrow record
+    // 4️⃣ Create borrow entry
     const borrow = await Borrow.create({ book: bookId, quantity, dueDate });
 
-    res.status(201).json({
-      success: true,
-      message: 'Book borrowed successfully',
-      data: borrow,
-    });
+    // 5️⃣ Respond success
+    sendResponse(res, borrow, 'Book borrowed successfully', 201);
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Borrow failed',
-      error,
-    });
+    next(error);
   }
 };
 
-export const getBorrowSummary = async (req: Request, res: Response): Promise<void> => {
+// ✅ Borrow Summary Controller (with aggregation)
+export const getBorrowSummary = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
   try {
     const summary = await Borrow.aggregate([
       {
@@ -67,9 +79,7 @@ export const getBorrowSummary = async (req: Request, res: Response): Promise<voi
           as: 'bookDetails',
         },
       },
-      {
-        $unwind: '$bookDetails',
-      },
+      { $unwind: '$bookDetails' },
       {
         $project: {
           _id: 0,
@@ -82,16 +92,8 @@ export const getBorrowSummary = async (req: Request, res: Response): Promise<voi
       },
     ]);
 
-    res.status(200).json({
-      success: true,
-      message: 'Borrowed books summary retrieved successfully',
-      data: summary,
-    });
+    sendResponse(res, { data: summary }, 'Borrowed books summary retrieved successfully', 200);
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: 'Aggregation failed',
-      error,
-    });
+    next(error);
   }
 };

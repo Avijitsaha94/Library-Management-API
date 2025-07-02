@@ -9,10 +9,19 @@ import {
 
 const router = express.Router();
 
+//  Create a book
 router.post('/', createBook);
+
+//  Get all books (supports pagination, filter, sort)
 router.get('/', getAllBooks);
+
+//  Get single book by ID
 router.get('/:bookId', getBookById);
-router.put('/:bookId', updateBook);
+
+//  Update book
+router.patch('/:bookId', updateBook); // ✅ Changed from PUT to PATCH
+
+//  Delete book
 router.delete('/:bookId', deleteBook);
 
-export { router as BookRoutes };
+export default router; // ✅ Changed export style
