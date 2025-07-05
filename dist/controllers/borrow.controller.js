@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBorrowSummary = exports.borrowBook = void 0;
 const borrow_model_1 = require("../models/borrow.model");
 const book_model_1 = require("../models/book.model");
-// Static method to update availability
+const sendResponse_1 = require("../utils/sendResponse");
 const updateAvailability = (bookId) => __awaiter(void 0, void 0, void 0, function* () {
     const book = yield book_model_1.Book.findById(bookId);
     if (book && book.copies <= 0) {
@@ -20,41 +20,44 @@ const updateAvailability = (bookId) => __awaiter(void 0, void 0, void 0, functio
         yield book.save();
     }
 });
-const borrowBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const borrowBook = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { book: bookId, quantity, dueDate } = req.body;
+        // Check if the book exists
         const book = yield book_model_1.Book.findById(bookId);
-        if (!book || book.copies < quantity) {
+        if (!book) {
+            res.status(404).json({
+                success: false,
+                message: 'Book not found',
+            });
+            return; // important: stop further execution
+        }
+        //  Validate quantity
+        if (quantity > book.copies) {
             res.status(400).json({
                 success: false,
-                message: 'Not enough copies available',
-                error: {},
+                message: 'Requested quantity exceeds available copies',
             });
-            return;
+            return; // stop further execution
         }
-        // Update book copies
+        //  Update book copies and availability
         book.copies -= quantity;
+        if (book.copies === 0) {
+            book.available = false;
+        }
         yield book.save();
-        // Check if available needs to be updated
-        yield updateAvailability(book._id.toString());
-        // Save borrow record
+        //  Create borrow entry
         const borrow = yield borrow_model_1.Borrow.create({ book: bookId, quantity, dueDate });
-        res.status(201).json({
-            success: true,
-            message: 'Book borrowed successfully',
-            data: borrow,
-        });
+        //  Respond success
+        (0, sendResponse_1.sendResponse)(res, borrow, 'Book borrowed successfully', 201);
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Borrow failed',
-            error,
-        });
+        next(error);
     }
 });
 exports.borrowBook = borrowBook;
-const getBorrowSummary = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+//  Borrow Summary Controller (with aggregation)
+const getBorrowSummary = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const summary = yield borrow_model_1.Borrow.aggregate([
             {
@@ -71,9 +74,7 @@ const getBorrowSummary = (req, res) => __awaiter(void 0, void 0, void 0, functio
                     as: 'bookDetails',
                 },
             },
-            {
-                $unwind: '$bookDetails',
-            },
+            { $unwind: '$bookDetails' },
             {
                 $project: {
                     _id: 0,
@@ -85,18 +86,10 @@ const getBorrowSummary = (req, res) => __awaiter(void 0, void 0, void 0, functio
                 },
             },
         ]);
-        res.status(200).json({
-            success: true,
-            message: 'Borrowed books summary retrieved successfully',
-            data: summary,
-        });
+        (0, sendResponse_1.sendResponse)(res, { data: summary }, 'Borrowed books summary retrieved successfully', 200);
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Aggregation failed',
-            error,
-        });
+        next(error);
     }
 });
 exports.getBorrowSummary = getBorrowSummary;

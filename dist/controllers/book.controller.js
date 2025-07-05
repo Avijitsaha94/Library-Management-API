@@ -11,50 +11,52 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteBook = exports.updateBook = exports.getBookById = exports.getAllBooks = exports.createBook = void 0;
 const book_model_1 = require("../models/book.model");
-const createBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const sendResponse_1 = require("../utils/sendResponse");
+// CREATE
+const createBook = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const book = yield book_model_1.Book.create(req.body);
-        res.status(201).json({
-            success: true,
-            message: 'Book created successfully',
-            data: book,
-        });
+        (0, sendResponse_1.sendResponse)(res, book, 'Book created successfully', 201);
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Validation failed',
-            error,
-        });
+        next(error);
     }
 });
 exports.createBook = createBook;
-const getAllBooks = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// GET ALL WITH PAGINATION, FILTER, SORT
+const getAllBooks = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { filter, sortBy = 'createdAt', sort = 'asc', limit = '10' } = req.query;
+        const { filter, // filter by genre
+        sortBy = 'createdAt', sort = 'asc', limit = '10', page = '1', } = req.query;
+        const parsedLimit = parseInt(limit) || 10;
+        const parsedPage = parseInt(page) || 1;
+        const skip = (parsedPage - 1) * parsedLimit;
         const query = {};
         if (filter) {
             query.genre = filter;
         }
+        const total = yield book_model_1.Book.countDocuments(query);
         const books = yield book_model_1.Book.find(query)
             .sort({ [sortBy]: sort === 'desc' ? -1 : 1 })
-            .limit(parseInt(limit));
-        res.status(200).json({
-            success: true,
-            message: 'Books retrieved successfully',
+            .skip(skip)
+            .limit(parsedLimit);
+        (0, sendResponse_1.sendResponse)(res, {
             data: books,
-        });
+            meta: {
+                total,
+                limit: parsedLimit,
+                page: parsedPage,
+                totalPages: Math.ceil(total / parsedLimit),
+            },
+        }, 'Books retrieved successfully');
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to retrieve books',
-            error,
-        });
+        next(error);
     }
 });
 exports.getAllBooks = getAllBooks;
-const getBookById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// GET BY ID
+const getBookById = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const book = yield book_model_1.Book.findById(req.params.bookId);
         if (!book) {
@@ -65,22 +67,15 @@ const getBookById = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             });
             return;
         }
-        res.status(200).json({
-            success: true,
-            message: 'Book retrieved successfully',
-            data: book,
-        });
+        (0, sendResponse_1.sendResponse)(res, book, 'Book retrieved successfully');
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to retrieve book',
-            error,
-        });
+        next(error);
     }
 });
 exports.getBookById = getBookById;
-const updateBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// UPDATE
+const updateBook = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const book = yield book_model_1.Book.findByIdAndUpdate(req.params.bookId, req.body, {
             new: true,
@@ -94,22 +89,15 @@ const updateBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             });
             return;
         }
-        res.status(200).json({
-            success: true,
-            message: 'Book updated successfully',
-            data: book,
-        });
+        (0, sendResponse_1.sendResponse)(res, book, 'Book updated successfully');
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to update book',
-            error,
-        });
+        next(error);
     }
 });
 exports.updateBook = updateBook;
-const deleteBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+// DELETE
+const deleteBook = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const book = yield book_model_1.Book.findByIdAndDelete(req.params.bookId);
         if (!book) {
@@ -120,18 +108,10 @@ const deleteBook = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             });
             return;
         }
-        res.status(200).json({
-            success: true,
-            message: 'Book deleted successfully',
-            data: null,
-        });
+        (0, sendResponse_1.sendResponse)(res, null, 'Book deleted successfully');
     }
     catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Failed to delete book',
-            error,
-        });
+        next(error);
     }
 });
 exports.deleteBook = deleteBook;
